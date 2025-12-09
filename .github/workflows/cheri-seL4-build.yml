@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - seL4/**
+      - .github/workflows/cheri-seL4-build.yml
   workflow_dispatch: # Allows manual triggering of this workflow
 
 jobs:
@@ -23,8 +24,7 @@ jobs:
       GHCR_REGISTRY: ghcr.io
       GHCR_ORG_NAME: the-capable-hub
       DOCKER_REGISTRY: docker.io
-      DOCKER_ORG_NAME: thecapablehub
-      # Default to false
+      DOCKER_ORG_NAME: capablehub
       SHOULD_PUSH: false
 
     steps:
