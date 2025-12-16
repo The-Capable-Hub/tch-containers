@@ -1,0 +1,28 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update
+RUN apt-get install -y git-core python3-pip python3-websockets \
+    locales chrpath cpio diffstat file gawk lz4 zstd wget sudo \
+    podman skopeo fuse-overlayfs jq curl libc++-dev libc++abi-dev \
+    iproute2 iputils-ping telnet python3-pexpect
+
+RUN wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb && apt install -y ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+
+RUN locale-gen en_US.UTF-8
+RUN update-locale
+RUN adduser --quiet --disabled-password --gecos 'user' ci
+RUN usermod -u 1000 -g 1000 ci -o
+RUN echo ci:ci | chpasswd
+RUN usermod -aG sudo ci
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+USER ci
+WORKDIR /home/ci
+ENV PATH=/home/ci/.local/bin:${PATH}
+ENV HOME=/home/ci
+
+RUN pip3 install kas --break-system-packages
+RUN kas --version
+CMD "/bin/bash"
