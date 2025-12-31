@@ -1,0 +1,29 @@
+FROM ghcr.io/anyvm-org/anyvm:v0.0.5
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG ANYVM_DIR=/anyvm
+ARG ANYVM_DATA=${ANYVM_DIR}/data
+ARG ANYVM_CACHE=${ANYVM_DIR}/cache
+
+ARG MEMORY=2048
+ARG CPUS=8
+
+USER ROOT
+
+RUN apt-get update && apt-get install -yy \
+    curl && \
+    rm -rf /var/cache/apt/archives /var/lib/apt/lists/*
+
+RUN curl -s https://raw.githubusercontent.com/anyvm-org/anyvm/v0.2.0/anyvm.py -o ${{ env.ANYVM_DATA }}/anyvm.py
+
+RUN mkdir -p ${ANYVM_CACHE}
+RUN mkdir -p £{ANYVM_DATA}
+
+RUN python3 ${{ env.ANYVM_DATA }}/anyvm.py --os freebsd --arch x86_64 \
+    --mem ${MEMORY} --cpu ${CPUS} \
+    -v /__w/freebsd-src/freebsd-src/:/freebsd-src \
+    --data-dir ${ANYVM_DATA} \
+    --cache-dir ${ANYVM_CACHE} \
+    --debug
+
+ENTRYPOINT [ "/bin/sh" ]
