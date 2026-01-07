@@ -19,26 +19,26 @@ jobs:
            run: |
               uname -a
 
-#    Hello_World_ARM:
-#       runs-on: the-capable-hub-aws-ci-arm64
+   Hello_World_ARM:
+      runs-on: the-capable-hub-aws-ci-arm64
 
-#       steps:
-#          - name: Hello_World
-#            run: |
-#               echo "Hello!"
+      steps:
+         - name: Hello_World
+           run: |
+              echo "Hello!"
 
-#          - name: Check arch
-#            run: |
-#               uname -a
+         - name: Check arch
+           run: |
+              uname -a
 
-#    Hello_World_AMD64:
-#       runs-on: the-capable-hub-aws-ci-amd64
+   Hello_World_AMD64:
+      runs-on: the-capable-hub-aws-ci-amd64
 
-#       steps:
-#          - name: Hello_World
-#            run: |
-#               echo "Hello!"
+      steps:
+         - name: Hello_World
+           run: |
+              echo "Hello!"
 
-#          - name: Check arch
-#            run: |
-#               uname -a
+         - name: Check arch
+           run: |
+              uname -a
