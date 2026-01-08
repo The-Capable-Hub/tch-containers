@@ -1,0 +1,159 @@
+name: Reusable Build and Merge Workflow - LLVM
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: "Image name for the build"
+        required: true
+        type: string
+      llvm_version:
+        description: "LLVM Version"
+        required: true
+        type: string
+      repo_url:
+        description: "Repository URL"
+        required: true
+        type: string
+      branch:
+        description: "Branch to pull source"
+        required: true
+        type: string
+      commit_hash:
+        description: "Commit hash to build"
+        required: true
+        type: string
+
+env:
+  REPO_DIR: ${{ github.workspace }}/volatile/repo
+  GHCR_ORG_NAME: the-capable-hub
+  DOCKER_ORG_NAME: capablehub
+  TARGET: riscv64
+
+jobs:
+  build-and-push:
+    runs-on: the-capable-hub-aws-ci-${{ matrix.arch }}
+    permissions:
+      packages: write
+      contents: read
+      attestations: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout workflow repository
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.REPO_DIR }}
+     
+      - name: Get short commit hash
+        run: |
+          FULL_HASH="${{ inputs.commit_hash }}"
+          SHORT_COMMIT_HASH="${FULL_HASH:0:7}"
+          echo "Using short commit hash for tagging: ${SHORT_COMMIT_HASH}"
+          echo "SHORT_COMMIT_HASH=${SHORT_COMMIT_HASH}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_IO_NAME }}
+          password: ${{ secrets.DOCKER_IO_TOKEN }}
+
+      - name: Build and push arch specific images
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.REPO_DIR }}
+          file: ${{ env.REPO_DIR }}/llvm/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:${{ inputs.llvm_version }}-${{ env.TARGET }}-${{ env.SHORT_COMMIT_HASH }}-${{ matrix.arch }}
+            docker.io/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:${{ inputs.llvm_version }}-${{ env.TARGET }}-${{ env.SHORT_COMMIT_HASH }}-${{ matrix.arch }}
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            REPO_URL=${{ inputs.repo_url }}
+            BRANCH=${{ inputs.branch }}
+            COMMIT_HASH=${{ inputs.commit_hash }}
+
+  merge-images:
+    needs: build-and-push
+    runs-on: the-capable-hub-aws-ci-arm64
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_IO_NAME }}
+          password: ${{ secrets.DOCKER_IO_TOKEN }}
+
+      - name: Determine if provided commit is the latest
+        run: |
+          # Fetch the latest commit of the specified branch from the remote repository
+          LATEST_COMMIT=$(git ls-remote ${{ inputs.repo_url }} refs/heads/${{ inputs.branch }} | awk '{print $1}')
+
+          echo "Latest commit on branch '${{ inputs.branch }}': $LATEST_COMMIT"
+          echo "Provided commit hash: ${{ inputs.commit_hash }}"
+
+          # Check if the provided commit matches the latest commit
+          if [[ "${LATEST_COMMIT}" == "${{ inputs.commit_hash }}" ]]; then
+            echo "Commit hash matches the latest commit. Setting IS_LATEST to true."
+            echo "IS_LATEST=true" >> $GITHUB_ENV
+          else
+            echo "Commit hash does not match the latest commit."
+            echo "IS_LATEST=false" >> $GITHUB_ENV
+          fi
+
+      - name: Get short commit hash
+        run : |
+          FULL_HASH="${{ inputs.commit_hash }}"
+          SHORT_COMMIT_HASH="${FULL_HASH:0:7}"
+          echo "Using short commit hash: ${SHORT_COMMIT_HASH}"
+          echo "SHORT_COMMIT_HASH=${SHORT_COMMIT_HASH}" >> $GITHUB_ENV
+
+      - name: Create and Push Multi-Arch Manifest
+        run: |
+          IMAGE_TAG=${{ inputs.llvm_version }}-${{ env.TARGET }}-${{ env.SHORT_COMMIT_HASH }}
+          LATEST_TAG=${{ inputs.llvm_version }}-${{ env.TARGET }}-latest
+
+          # Merge and push multi-arch images
+          docker buildx imagetools create \
+            ghcr.io/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG-amd64 \
+            ghcr.io/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG-arm64 \
+            -t ghcr.io/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG
+
+          docker buildx imagetools create \
+            docker.io/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG-amd64 \
+            docker.io/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG-arm64 \
+            -t docker.io/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG
+
+          # Optionally tag as 'latest'
+          if [[ "${{ env.IS_LATEST }}" == "true" ]]; then
+            docker buildx imagetools create \
+              ghcr.io/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG-amd64 \
+              ghcr.io/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG-arm64 \
+              -t ghcr.io/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:$LATEST_TAG
+
+            docker buildx imagetools create \
+              docker.io/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG-amd64 \
+              docker.io/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:$IMAGE_TAG-arm64 \
+              -t docker.io/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:$LATEST_TAG
+          fi

@@ -1,0 +1,24 @@
+name: CA LLVM 18
+
+on:
+  push:
+    branches:
+      - release/cheri-ca-llvm-18
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-and-merge:
+    uses: ./.github/workflows/cheri-llvm-build-and-merge.yml
+    secrets: inherit
+    with:
+      image_name: cheri-ca-llvm
+      llvm_version: 18
+      repo_url: https://github.com/CHERI-Alliance/llvm-project.git
+      branch: codasip-cheri-riscv-18
+      commit_hash: 7ca5cdc690a7c41d3c45c53971a766812e730136
