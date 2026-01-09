@@ -4,6 +4,8 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    apt-utils \
     coreutils \
     sudo \
     locales \
@@ -48,3 +50,8 @@ WORKDIR /home/ci
 ENV PATH=/home/ci/.local/bin:${PATH}
 ENV HOME=/home/ci
 
+# Allow installation of python packages using pip
+RUN python3 -m pip config set global.break-system-packages true
+
+# Install AWS CLI
+RUN pip3 install awscli --upgrade --user
