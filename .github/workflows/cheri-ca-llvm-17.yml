@@ -1,0 +1,24 @@
+name: CA LLVM 17
+
+on:
+  push:
+    branches:
+      - release/cheri-ca-llvm-17
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-and-merge:
+    uses: ./.github/workflows/cheri-llvm-build-and-merge.yml
+    secrets: inherit
+    with:
+      image_name: cheri-ca-llvm
+      llvm_version: 17
+      repo_url: https://github.com/CHERI-Alliance/llvm-project.git
+      branch: codasip-cheri-riscv
+      commit_hash: 678272e8548fa3f021e591854d062d694086bf83

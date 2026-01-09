@@ -1,0 +1,24 @@
+name: CTSRD LLVM 17
+
+on:
+  push:
+    branches:
+      - release/cheri-ctsrd-llvm-17
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-and-merge:
+    uses: ./.github/workflows/cheri-llvm-build-and-merge.yml
+    secrets: inherit
+    with:
+      image_name: cheri-ctsrd-llvm
+      llvm_version: 17
+      repo_url: https://github.com/CTSRD-CHERI/llvm-project.git
+      branch: master
+      commit_hash: 74d200f2bb65b06633ca87f86b1b9145ebf63a46

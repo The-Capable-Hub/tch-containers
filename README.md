@@ -9,6 +9,6 @@ Docker images are published to The Capable Hub [Dockerhub](https://hub.docker.co
 
 Currently Supported:
 - [seL4](seL4/Dockerfile)
-- [qemu](qemu/Dockerfile)
 - [yocto](yocto/Dockerfile-morello)
 - [zephyr](zephyr/README.md)
+- [llvm](llvm/README.md)
