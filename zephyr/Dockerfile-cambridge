@@ -1,5 +1,5 @@
 ## STAGE 1: Use a temporary container to build QEMU, LLVM and GDB for Cambridge
-FROM ubuntu:22.04 AS cheri-builder
+FROM ubuntu:24.04 AS cheri-builder
 
 # Set non-interactive frontend for apt to skip any user confirmations
 ENV DEBIAN_FRONTEND=noninteractive
@@ -24,8 +24,6 @@ RUN apt update -y && \
     file \
     make \
     gcc \
-    gcc-multilib \
-    g++-multilib \
     libsdl2-dev \
     libmagic1 \
     python3-venv \
@@ -60,21 +58,51 @@ RUN useradd -m -s /bin/bash builder && echo "builder ALL=(ALL) NOPASSWD:ALL" >> 
 WORKDIR /home/builder
 USER builder
 
-# Get the cheribuild script and build the freestanding-cheri-sdk
-RUN git clone https://github.com/CTSRD-CHERI/cheribuild.git && \
-    cd cheribuild && \
-    ./cheribuild.py freestanding-cheri-sdk -d
+# Build Cambridge QEMU
+RUN git clone --depth 1 --branch qemu-cheri https://github.com/CTSRD-CHERI/qemu.git qemu-cambridge && \
+    cd qemu-cambridge && \    
+    mkdir build install && \
+    cd build && \
+    ../configure \
+        --disable-sdl --disable-gtk --disable-opengl --disable-virglrenderer \
+        --disable-stack-protector --disable-strip --smbd=/usr/sbin/smbd \
+        --disable-xen --disable-docs --disable-rdma --disable-werror \
+        --cxx=/usr/bin/clang++ --cc=/usr/bin/clang \
+        --python=/usr/bin/python3 \
+        --extra-cflags="-O3 -Wno-error" \
+        --disable-capstone --disable-bsd-user --disable-linux-user --enable-slirp=git \
+        --target-list=riscv64-softmmu,riscv64cheri-softmmu \
+        --prefix=/home/builder/qemu-cambridge/install && \
+    ninja && \
+    ninja install && \
+    cd ~
 
+
+# Build Cambridge GDB
+RUN git clone --depth 1 --branch cheri-14 https://github.com/CTSRD-CHERI/gdb.git gdb-cambridge && \
+    cd gdb-cambridge && \   
+    mkdir build install && \
+    cd build && \
+    ../configure \
+        --disable-nls --enable-tui --disable-ld --disable-gold --disable-sim \
+        --enable-64-bit-bfd --without-gnu-as \
+        --disable-werror \
+        --disable-libstdcxx --with-guile=no --enable-targets=all --with-expat \
+        CC=/usr/bin/clang CXX=/usr/bin/clang++ \
+        CFLAGS="-O2 -fcommon" CXXFLAGS="-O2 -fcommon" \
+        LDFLAGS="" --prefix=/home/builder/gdb-cambridge/install && \
+    make -j$(nproc) && \
+    make install
 
 ## STAGE 2: Create an image to that has only the cheribuild binaries
-FROM ubuntu:22.04 AS cheri-runner
+FROM ubuntu:24.04 AS cheri-runner
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install runner dependencies
 RUN apt update -y && \
     apt upgrade -y && \
-    apt install -y \
+    apt install -y --no-install-recommends \
     git \
     cmake \
     ninja-build \
@@ -91,10 +119,9 @@ RUN apt update -y && \
     file \
     make \
     gcc \
-    gcc-multilib \
-    g++-multilib \
     libsdl2-dev \
     libmagic1 \
+    libpixman-1-dev \
     python3-venv && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -104,25 +131,27 @@ RUN useradd -m -s /bin/bash builder && echo "builder ALL=(ALL) NOPASSWD:ALL" >> 
 
 # Copy the cheri SDK tools into the runner
 RUN mkdir -p /opt/cheri-tools/
-COPY --from=cheri-builder --chown=builder:builder /home/builder/cheri/output /opt/cheri-tools/cheri
+COPY --from=cheri-builder --chown=builder:builder /home/builder/qemu-cambridge/install /opt/cheri-tools/qemu-cambridge
+COPY --from=capablehub/cheri-ctsrd-llvm:17-riscv64-74d200f --chown=builder:builder /root/llvm-cheri/install /opt/cheri-tools/llvm-cheri-cambridge
+COPY --from=cheri-builder --chown=builder:builder /home/builder/gdb-cambridge/install /opt/cheri-tools/gdb-cambridge
 RUN chown builder:builder /opt/cheri-tools
 
 WORKDIR /home/builder
 USER builder
 
-# Clone the CHERI-Zephyr release
-RUN git clone --branch CHERI-RISCV64-v2.0 --depth 1 https://github.com/CHERI-Alliance/CHERI-zephyr.git zephyr
-
-# Install west
-RUN python3 -m venv .venv && . .venv/bin/activate && \
+# Clone the CHERI-Zephyr release & Install west
+RUN git clone --branch CHERI-RISCV64-v2.0 --depth 1 https://github.com/CHERI-Alliance/CHERI-zephyr.git zephyr && \
+    python3 -m venv .venv && . .venv/bin/activate && \
     pip install --no-cache-dir west && \
     west init -l zephyr && \
     west update --narrow --fetch-opt=--depth=1 && \
     west zephyr-export && \
-    pip install --no-cache-dir -r zephyr/scripts/requirements.txt
+    pip install --no-cache-dir -r zephyr/scripts/requirements.txt && \
+    find . -name ".git" -type d -exec rm -rf {} +
 
 ENV ZEPHYR_TOOLCHAIN_VARIANT=llvm-cheri
-ENV LLVM_CHERI_TOOLCHAIN_PATH=/opt/cheri-tools/cheri/sdk
-ENV QEMU_BIN_PATH=/opt/cheri-tools/cheri/sdk/bin
+ENV LLVM_CHERI_TOOLCHAIN_PATH=/opt/cheri-tools/llvm-cheri-cambridge
+ENV QEMU_BIN_PATH=/opt/cheri-tools/qemu-cambridge/bin
+RUN echo "source ~/.venv/bin/activate" >> ~/.bashrc
 
 CMD ["bash"]
