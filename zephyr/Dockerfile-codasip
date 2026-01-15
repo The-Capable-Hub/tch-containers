@@ -1,5 +1,5 @@
 ## STAGE 1: Use a temporary container to build QEMU, LLVM and GDB for Cambridge
-FROM ubuntu:22.04 AS cheri-builder
+FROM ubuntu:24.04 AS cheri-builder
 
 # Set non-interactive frontend for apt to skip any user confirmations
 ENV DEBIAN_FRONTEND=noninteractive
@@ -24,8 +24,6 @@ RUN apt update -y && \
     file \
     make \
     gcc \
-    gcc-multilib \
-    g++-multilib \
     libsdl2-dev \
     libmagic1 \
     python3-venv \
@@ -77,26 +75,6 @@ RUN git clone --no-checkout --recurse-submodules --branch codasip-cheri-riscv_v3
      ninja install && \
      cd ~/
 
-# Build Codasip LLVM
-RUN git clone --no-checkout --recurse-submodules --branch codasip-cheri-riscv https://github.com/CHERI-Alliance/llvm-project.git llvm-cheri-codasip && \
-    cd llvm-cheri-codasip && \    
-    git checkout 1ca584e7 && \
-    mkdir build install && \
-    cd build && \
-    cmake \
-        -DCMAKE_INSTALL_PREFIX=/home/builder/llvm-cheri-codasip/install \
-        -DLLVM_TARGETS_TO_BUILD=RISCV \
-        -DLLVM_DEFAULT_TARGET_TRIPLE="riscv64-unknown-elf" \
-        -DLLVM_ENABLE_PROJECTS="clang;lld" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -GNinja ../llvm/ \
-        -DLLVM_USE_SPLIT_DWARF=ON \
-        -DBUILD_SHARED_LIBS=ON \
-        -Wno-dev && \
-    ninja && \
-    ninja install && \
-    cd ~/
-
 # Build Codasip GDB
 RUN git clone --no-checkout --recurse-submodules --branch codasip-cheri-riscv https://github.com/CHERI-Alliance/gdb.git gdb-codasip && \
     cd gdb-codasip && \
@@ -106,19 +84,19 @@ RUN git clone --no-checkout --recurse-submodules --branch codasip-cheri-riscv ht
     ../configure \
         --target=riscv64-unknown-elf \
         --prefix=/home/builder/gdb-codasip/install && \
-    make && \
+    make -j$(nproc) && \
     make install &&\
     cd ~/
 
 ## STAGE 2: Create an image to that has only the cheribuild binaries
-FROM ubuntu:22.04 AS cheri-runner
+FROM ubuntu:24.04 AS cheri-runner
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install runner dependencies
 RUN apt update -y && \
     apt upgrade -y && \
-    apt install -y \
+    apt install -y --no-install-recommends \
     git \
     cmake \
     ninja-build \
@@ -135,10 +113,9 @@ RUN apt update -y && \
     file \
     make \
     gcc \
-    gcc-multilib \
-    g++-multilib \
     libsdl2-dev \
     libmagic1 \
+    libpixman-1-dev \
     python3-venv && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -149,26 +126,26 @@ RUN useradd -m -s /bin/bash builder && echo "builder ALL=(ALL) NOPASSWD:ALL" >> 
 # Copy the cheri SDK tools into the runner
 RUN mkdir -p /opt/cheri-tools/
 COPY --from=cheri-builder /home/builder/qemu-codasip/install /opt/cheri-tools/qemu-codasip
-COPY --from=cheri-builder /home/builder/llvm-cheri-codasip/install /opt/cheri-tools/llvm-cheri-codasip
+COPY --from=capablehub/cheri-ca-llvm:17-riscv64-678272e --chown=builder:builder /root/llvm-cheri/install /opt/cheri-tools/llvm-cheri-codasip
 COPY --from=cheri-builder /home/builder/gdb-codasip/install  /opt/cheri-tools/gdb-codasip 
 RUN chown builder:builder /opt/cheri-tools
 
 WORKDIR /home/builder
 USER builder
 
-# Clone the CHERI-Zephyr release
-RUN git clone --branch CHERI-RISCV64-v2.0 --depth 1 https://github.com/CHERI-Alliance/CHERI-zephyr.git zephyr
-
-# Install west
-RUN python3 -m venv .venv && . .venv/bin/activate && \
+# Clone the CHERI-Zephyr release & Install west
+RUN git clone --branch CHERI-RISCV64-v2.0 --depth 1 https://github.com/CHERI-Alliance/CHERI-zephyr.git zephyr && \
+    python3 -m venv .venv && . .venv/bin/activate && \
     pip install --no-cache-dir west && \
     west init -l zephyr && \
     west update --narrow --fetch-opt=--depth=1 && \
     west zephyr-export && \
-    pip install --no-cache-dir -r zephyr/scripts/requirements.txt
+    pip install --no-cache-dir -r zephyr/scripts/requirements.txt && \
+    find . -name ".git" -type d -exec rm -rf {} +
 
 ENV ZEPHYR_TOOLCHAIN_VARIANT=llvm-cheri
 ENV LLVM_CHERI_TOOLCHAIN_PATH=/opt/cheri-tools/llvm-cheri-codasip
 ENV QEMU_BIN_PATH=/opt/cheri-tools/qemu-codasip/bin
+RUN echo "source ~/.venv/bin/activate" >> ~/.bashrc
 
 CMD ["bash"]
