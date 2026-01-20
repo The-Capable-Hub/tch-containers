@@ -1,0 +1,25 @@
+name: cheri-zephyr ISAv9
+
+on:
+  push:
+    branches:
+      - release/cheri-zephyr-isav9
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-and-merge:
+    uses: ./.github/workflows/cheri-zephyr-build-and-merge.yml
+    secrets: inherit
+    with:
+      image_name: cheri-zephyr
+      cheri_zephyr_version: "v0.2.0"
+      repo_url: https://github.com/CHERI-Alliance/CHERI-zephyr.git
+      branch: CHERI-RISCV64-v2.0
+      commit_hash: HEAD
+      enabled_tools: isav9
