@@ -6,7 +6,7 @@ RUN apt-get update
 RUN apt-get install -y git-core python3-pip python3-websockets \
     locales chrpath cpio diffstat file gawk lz4 zstd wget sudo \
     podman skopeo fuse-overlayfs jq curl libc++-dev libc++abi-dev \
-    iproute2 iputils-ping telnet python3-pexpect
+    iproute2 iputils-ping telnet python3-pexpect less curl gpg zip
 
 RUN wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb && apt install -y ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
 
@@ -23,6 +23,21 @@ WORKDIR /home/ci
 ENV PATH=/home/ci/.local/bin:${PATH}
 ENV HOME=/home/ci
 
+RUN mkdir /tmp/awscli
+ADD --chown=ci:ci awsclikey /tmp/awsclikey
+
+RUN cd /tmp/awscli && \
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    curl -o awscliv2.sig https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip.sig && \
+    gpg --import /tmp/awsclikey &&\
+    gpg --verify awscliv2.sig awscliv2.zip && \
+    unzip awscliv2.zip && \
+    sudo ./aws/install
+
+RUN aws --version
+
 RUN pip3 install kas --break-system-packages
 RUN kas --version
 CMD "/bin/bash"
+
+

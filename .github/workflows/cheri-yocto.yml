@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - yocto/**
-      - .github/workflows/cheri-yocto-morello.yml
+      - .github/workflows/cheri-yocto.yml
   workflow_dispatch: # Allows manual triggering of this workflow
 
 jobs:
@@ -60,11 +60,11 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5 
         with:
-          context: ${{ env.REPO_DIR }}
-          file: ${{ env.REPO_DIR }}/yocto/Dockerfile-morello
+          context: ${{ env.REPO_DIR }}/yocto
+          file: ${{ env.REPO_DIR }}/yocto/Dockerfile-yocto
           push: ${{ env.SHOULD_PUSH }}
           tags: |
-            ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_ORG_NAME }}/cheri-yocto-morello:latest
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_ORG_NAME }}/cheri-yocto-morello:latest
+            ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_ORG_NAME }}/cheri-yocto:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_ORG_NAME }}/cheri-yocto:latest
           platforms: linux/amd64
           
