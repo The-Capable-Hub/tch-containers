@@ -60,7 +60,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5 
         with:
-          context: ${{ env.REPO_DIR }}
+          context: ${{ env.REPO_DIR }}/builder/ubuntu-24
           file: ${{ env.REPO_DIR }}/builder/ubuntu-24/Dockerfile
           push: ${{ env.SHOULD_PUSH }}
           tags: |
