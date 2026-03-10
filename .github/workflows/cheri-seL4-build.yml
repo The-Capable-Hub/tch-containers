@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - seL4/**
+      - seL4/build/**
       - .github/workflows/cheri-seL4-build.yml
   workflow_dispatch: # Allows manual triggering of this workflow
 
@@ -61,7 +61,7 @@ jobs:
         uses: docker/build-push-action@v5 
         with:
           context: ${{ env.REPO_DIR }}
-          file: ${{ env.REPO_DIR }}/seL4/Dockerfile
+          file: ${{ env.REPO_DIR }}/seL4/build/Dockerfile
           push: ${{ env.SHOULD_PUSH }}
           tags: |
             ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_ORG_NAME }}/cheri-sel4-riscv:latest
