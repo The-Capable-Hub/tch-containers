@@ -1,0 +1,18 @@
+name: cheri-sel4-ci-riscv-base Build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - seL4/CI/rvy-base/**
+      - .github/workflows/cheri-seL4-ci-rvy-base.yml
+  workflow_dispatch: # Allows manual triggering of this workflow
+
+jobs:
+  build-and-push:
+    uses: ./.github/workflows/cheri-seL4-ci-build-and-push.yml
+    secrets: inherit
+    with:
+      image_name: cheri-sel4-ci-riscv-base
+      dockerfile_path: sel4/CI/rvy-base/Dockerfile

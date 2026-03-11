@@ -1,13 +1,28 @@
-name: cheri-sel4-riscv Build
+name: Reusable Build and Push Workflow - seL4 CI
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - seL4/build/**
-      - .github/workflows/cheri-seL4-build.yml
-  workflow_dispatch: # Allows manual triggering of this workflow
+  workflow_call:
+    inputs:
+      image_name:
+        description: "Image name for the build"
+        required: true
+        type: string
+      image_tag:
+        description: "Image tag for the build, 'latest' by default"
+        required: false
+        type: string
+        default: "latest"
+      dockerfile_path:
+        description: "path to Dockerfile to build, relative to env.REPO_DIR"
+        required: true
+        type: string
+
+env:
+  REPO_DIR: ${{ github.workspace }}/volatile/repo
+  GHCR_REGISTRY: ghcr.io
+  GHCR_ORG_NAME: the-capable-hub
+  DOCKER_REGISTRY: docker.io
+  DOCKER_ORG_NAME: capablehub
 
 jobs:
   build-and-push:
@@ -20,11 +35,7 @@ jobs:
     env:
       REPO_DIR: ${{ github.workspace }}/volatile/repo
       REPO_NAME: ${{ github.event.repository.name }}
-      BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
-      GHCR_REGISTRY: ghcr.io
-      GHCR_ORG_NAME: the-capable-hub
-      DOCKER_REGISTRY: docker.io
-      DOCKER_ORG_NAME: capablehub
+      BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
       SHOULD_PUSH: false
 
     steps:
@@ -35,20 +46,20 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }} 
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to Docker Container Registry
         uses: docker/login-action@v3
         with:
           registry: docker.io
-          username: ${{ secrets.DOCKER_IO_NAME }} 
-          password: ${{ secrets.DOCKER_IO_TOKEN }} 
+          username: ${{ secrets.DOCKER_IO_NAME }}
+          password: ${{ secrets.DOCKER_IO_TOKEN }}
 
       - name: Determine push status
         # IF main branch AND push event, enable push
@@ -58,12 +69,12 @@ jobs:
           echo "SHOULD_PUSH=true" >> $GITHUB_ENV
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5 
+        uses: docker/build-push-action@v5
         with:
           context: ${{ env.REPO_DIR }}
-          file: ${{ env.REPO_DIR }}/seL4/build/Dockerfile
+          file: ${{ env.REPO_DIR }}/${{ inputs.dockerfile_path }}
           push: ${{ env.SHOULD_PUSH }}
           tags: |
-            ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_ORG_NAME }}/cheri-sel4-riscv:latest
-            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_ORG_NAME }}/cheri-sel4-riscv:latest
+            ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:${{ inputs.image_tag }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:${{ inputs.image_tag }}
           platforms: linux/amd64
