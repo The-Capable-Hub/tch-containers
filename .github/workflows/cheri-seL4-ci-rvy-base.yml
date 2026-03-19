@@ -22,3 +22,10 @@ jobs:
     with:
       image_name: cheri-sel4-ci-riscv-base
       dockerfile_path: seL4/CI/rvy-base/Dockerfile
+      docker_build_args: |
+        "LLVM_BRANCH=codasip-cheri-riscv-18"
+        "LLVM_COMMIT_HASH=7ca5cdc690a7c41d3c45c53971a766812e730136"
+        "QEMU_BRANCH=codasip-cheri-riscv_v3"
+        "QEMU_COMMIT_HASH=HEAD"
+        "OPENSBI_BRANCH=toooba-fixes"
+        "OPENSBI_COMMIT_HASH=HEAD"

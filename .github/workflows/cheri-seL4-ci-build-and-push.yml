@@ -16,6 +16,10 @@ on:
         description: "path to Dockerfile to build, relative to env.REPO_DIR"
         required: true
         type: string
+      docker_build_args:
+        description: "'key=value' list of args to pass to the Docker build, delimited by newlines"
+        required: false
+        type: string
 
 env:
   REPO_DIR: ${{ github.workspace }}/volatile/repo
@@ -74,6 +78,7 @@ jobs:
           context: ${{ env.REPO_DIR }}
           file: ${{ env.REPO_DIR }}/${{ inputs.dockerfile_path }}
           push: ${{ env.SHOULD_PUSH }}
+          build-args: ${{ inputs.docker_build_args }}
           tags: |
             ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_ORG_NAME }}/${{ inputs.image_name }}:${{ inputs.image_tag }}
             ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_ORG_NAME }}/${{ inputs.image_name }}:${{ inputs.image_tag }}
