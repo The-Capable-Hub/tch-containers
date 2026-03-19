@@ -66,8 +66,8 @@ jobs:
           password: ${{ secrets.DOCKER_IO_TOKEN }}
 
       - name: Determine push status
-        # IF main branch AND push event, enable push
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        # IF main branch AND push event or workflow_run, enable push
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_run')
         run: |
           echo "This is a push to ${{ env.BRANCH_NAME }}, so we will publish the containers."
           echo "SHOULD_PUSH=true" >> $GITHUB_ENV
