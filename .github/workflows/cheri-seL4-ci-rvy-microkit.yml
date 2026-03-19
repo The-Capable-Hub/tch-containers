@@ -21,6 +21,7 @@ permissions:
 
 jobs:
   build-and-push:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/cheri-seL4-ci-build-and-push.yml
     secrets: inherit
     with:
