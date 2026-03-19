@@ -25,4 +25,4 @@ jobs:
     secrets: inherit
     with:
       image_name: cheri-sel4-ci-riscv-microkit
-      dockerfile_path: sel4/CI/rvy-microkit/Dockerfile
+      dockerfile_path: seL4/CI/rvy-microkit/Dockerfile
